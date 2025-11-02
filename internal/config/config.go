@@ -20,9 +20,13 @@ type Config struct {
 var Envs = initConfig()
 
 func initConfig() Config {
-	log.Println("Running in development mode, loading .env")
-	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found")
+	envFile := os.Getenv("ENV_FILE")
+	if envFile == "" {
+		envFile = ".env"
+	}
+	log.Println("Running in development mode, loading ", envFile)
+	if err := godotenv.Load(envFile); err != nil {
+		log.Println("No ", envFile, " file found")
 	}
 
 	return Config{
