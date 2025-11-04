@@ -1,19 +1,19 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
-	"net/http"
-	"time"
 	"fmt"
 	"io"
-	"context"
+	"net/http"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/rohits-web03/cryptodrop/internal/config"
-	"github.com/rohits-web03/cryptodrop/internal/models"
-	"github.com/rohits-web03/cryptodrop/internal/repositories"
-	"github.com/rohits-web03/cryptodrop/internal/utils"
-	"github.com/rohits-web03/cryptodrop/internal/api/services"
+	"github.com/rohits-web03/obscyra/internal/api/services"
+	"github.com/rohits-web03/obscyra/internal/config"
+	"github.com/rohits-web03/obscyra/internal/models"
+	"github.com/rohits-web03/obscyra/internal/repositories"
+	"github.com/rohits-web03/obscyra/internal/utils"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -324,37 +324,36 @@ func HandleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 	var existingUser models.User
 	err = repositories.DB.Where("email = ?", googleUser.Email).First(&existingUser).Error
 
-	
 	switch flowType {
-		case "register":
-			// If registering but user already exists
-			if err == nil {
-				http.Redirect(w, r, "http://localhost:5173/login?error=user_already_exists", http.StatusTemporaryRedirect)
-				return
-			}
-			// Create new user
-			newUser := models.User{
-				Username: googleUser.Name,
-				Email:    googleUser.Email,
-				Password: "", // Google-authenticated
-				CreatedAt: time.Now(),
-			}
-			if err := repositories.DB.Create(&newUser).Error; err != nil {
-				http.Error(w, "Failed to create user", http.StatusInternalServerError)
-				return
-			}
-			existingUser = newUser
-
-		case "login":
-			// If logging in but user not found
-			if err == gorm.ErrRecordNotFound {
-				http.Redirect(w, r, "http://localhost:5173/register?error=user_not_found", http.StatusTemporaryRedirect)
-				return
-			} else if err != nil {
-				http.Error(w, "Database error", http.StatusInternalServerError)
-				return
-			}
+	case "register":
+		// If registering but user already exists
+		if err == nil {
+			http.Redirect(w, r, "http://localhost:5173/login?error=user_already_exists", http.StatusTemporaryRedirect)
+			return
 		}
+		// Create new user
+		newUser := models.User{
+			Username:  googleUser.Name,
+			Email:     googleUser.Email,
+			Password:  "", // Google-authenticated
+			CreatedAt: time.Now(),
+		}
+		if err := repositories.DB.Create(&newUser).Error; err != nil {
+			http.Error(w, "Failed to create user", http.StatusInternalServerError)
+			return
+		}
+		existingUser = newUser
+
+	case "login":
+		// If logging in but user not found
+		if err == gorm.ErrRecordNotFound {
+			http.Redirect(w, r, "http://localhost:5173/register?error=user_not_found", http.StatusTemporaryRedirect)
+			return
+		} else if err != nil {
+			http.Error(w, "Database error", http.StatusInternalServerError)
+			return
+		}
+	}
 
 	// Issue JWT
 	secret := config.Envs.JWTSecret

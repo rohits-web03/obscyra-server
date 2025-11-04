@@ -1,6 +1,6 @@
-# CryptoDrop API Server
+# Obscyra API Server
 
-This is the backend server for **CryptoDrop**, a secure file-sharing platform built in **Go**. It provides RESTful APIs for user authentication, file uploads, and file management.
+This is the backend server for **Obscyra**, a secure file-sharing platform built in **Go**. It provides RESTful APIs for user authentication, file uploads, and file management.
 
 ## API Documentation
 
@@ -19,10 +19,10 @@ swag init -g cmd/server/main.go
 If you're running the server using the `Dockerfile` in `server/`, follow these steps:
 1. Build the server image:
 ```bash
-docker build -t cryptodrop-server .
+docker build -t obscyra-server .
 ```
 2. Run the server container:
 ```bash
-docker run --env-file .env -p 8080:8080 --name cryptodrop-server cryptodrop-server
+docker run --env-file .env -p 8080:8080 --name obscyra-server obscyra-server
 ```
 

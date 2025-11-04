@@ -7,9 +7,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/rohits-web03/cryptodrop/internal/api"
-	"github.com/rohits-web03/cryptodrop/internal/config"
-	"github.com/rohits-web03/cryptodrop/internal/repositories"
+	"github.com/rohits-web03/obscyra/internal/api"
+	"github.com/rohits-web03/obscyra/internal/config"
+	"github.com/rohits-web03/obscyra/internal/repositories"
 )
 
 func main() {
@@ -44,7 +44,7 @@ func main() {
 		IdleTimeout:  120 * time.Second,
 	}
 
-	log.Printf("Starting CryptoDrop server on port: %s", port)
+	log.Printf("Starting Obscyra server on port: %s", port)
 
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("Could not listen on port %s: %v", port, err)

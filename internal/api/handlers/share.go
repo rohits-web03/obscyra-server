@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/rohits-web03/cryptodrop/internal/models"
-	"github.com/rohits-web03/cryptodrop/internal/repositories"
-	"github.com/rohits-web03/cryptodrop/internal/utils"
+	"github.com/rohits-web03/obscyra/internal/models"
+	"github.com/rohits-web03/obscyra/internal/repositories"
+	"github.com/rohits-web03/obscyra/internal/utils"
 )
 
 // GET /api/v1/share/{token}

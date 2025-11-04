@@ -5,11 +5,11 @@ import (
 	"log"
 	"net/http"
 
-	_ "github.com/rohits-web03/cryptodrop/docs"
+	_ "github.com/rohits-web03/obscyra/docs"
 	httpSwagger "github.com/swaggo/http-swagger"
 
-	"github.com/rohits-web03/cryptodrop/internal/api/handlers"
-	"github.com/rohits-web03/cryptodrop/internal/config"
+	"github.com/rohits-web03/obscyra/internal/api/handlers"
+	"github.com/rohits-web03/obscyra/internal/config"
 	"github.com/rs/cors"
 )
 

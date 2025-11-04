@@ -10,9 +10,9 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/google/uuid"
-	"github.com/rohits-web03/cryptodrop/internal/models"
-	"github.com/rohits-web03/cryptodrop/internal/repositories"
-	"github.com/rohits-web03/cryptodrop/internal/utils"
+	"github.com/rohits-web03/obscyra/internal/models"
+	"github.com/rohits-web03/obscyra/internal/repositories"
+	"github.com/rohits-web03/obscyra/internal/utils"
 	"gorm.io/gorm"
 )
 

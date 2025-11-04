@@ -1,4 +1,4 @@
-module github.com/rohits-web03/cryptodrop
+module github.com/rohits-web03/obscyra
 
 go 1.25.2
 

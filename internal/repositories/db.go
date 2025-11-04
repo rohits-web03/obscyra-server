@@ -3,8 +3,8 @@ package repositories
 import (
 	"log"
 
-	"github.com/rohits-web03/cryptodrop/internal/config"
-	"github.com/rohits-web03/cryptodrop/internal/models"
+	"github.com/rohits-web03/obscyra/internal/config"
+	"github.com/rohits-web03/obscyra/internal/models"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
