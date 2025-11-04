@@ -29,7 +29,7 @@ func SetupRouter() http.Handler {
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		fmt.Fprintf(w, "Welcome to CryptoDrop API!")
+		fmt.Fprintf(w, "Welcome to Obscyra API!")
 	})
 
 	authMux := http.NewServeMux()
@@ -42,11 +42,12 @@ func SetupRouter() http.Handler {
 	authMux.HandleFunc("/google/callback", handlers.HandleGoogleCallback)
 
 	fileMux := http.NewServeMux()
-	fileMux.HandleFunc("/", handlers.UploadFiles)
+	fileMux.HandleFunc("/presign", handlers.PresignUpload)
+	fileMux.HandleFunc("/complete", handlers.CompleteUpload)
 
 	shareMux := http.NewServeMux()
 	shareMux.HandleFunc("/{token}", handlers.GetSharedFiles)
-	shareMux.HandleFunc("/{token}/download/{index}", handlers.DownloadSharedFile)
+	shareMux.HandleFunc("/{token}/presign-download/{index}", handlers.PresignDownload)
 
 	// Mount fileMux under /files
 	apiMux.Handle("/files/", http.StripPrefix("/files", fileMux))

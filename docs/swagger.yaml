@@ -1,4 +1,40 @@
 definitions:
+  handlers.CompleteUploadInput:
+    properties:
+      files:
+        items:
+          properties:
+            contentType:
+              type: string
+            filename:
+              type: string
+            key:
+              type: string
+            size:
+              type: integer
+          type: object
+        type: array
+      token:
+        type: string
+    type: object
+  handlers.PresignResponse:
+    properties:
+      token:
+        type: string
+      urls:
+        items:
+          $ref: '#/definitions/handlers.PresignedFile'
+        type: array
+    type: object
+  handlers.PresignedFile:
+    properties:
+      filename:
+        type: string
+      key:
+        type: string
+      uploadURL:
+        type: string
+    type: object
   utils.Payload:
     properties:
       data: {}
@@ -10,34 +46,102 @@ definitions:
 info:
   contact: {}
 paths:
-  /api/v1/files:
+  /api/v1/files/complete:
     post:
       consumes:
-      - multipart/form-data
-      description: Upload multiple files (≤100 MB total) and receive a share token
+      - application/json
+      description: Verifies uploaded files on R2, stores file metadata, and registers
+        the upload session in the database. Each transfer is valid for 1 hour and
+        limited to 100MB for anonymous uploads.
       parameters:
-      - description: Files to upload
-        in: formData
-        name: files
+      - description: Upload completion payload
+        in: body
+        name: input
         required: true
-        type: file
+        schema:
+          $ref: '#/definitions/handlers.CompleteUploadInput'
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Files uploaded successfully
           schema:
-            $ref: '#/definitions/utils.Payload'
+            allOf:
+            - $ref: '#/definitions/utils.Payload'
+            - properties:
+                data:
+                  additionalProperties: true
+                  type: object
+              type: object
         "400":
-          description: Bad Request
+          description: Invalid input or verification failed
           schema:
             $ref: '#/definitions/utils.Payload'
-      summary: Upload one or more files anonymously
+        "405":
+          description: Method not allowed
+          schema:
+            $ref: '#/definitions/utils.Payload'
+        "500":
+          description: Database error
+          schema:
+            $ref: '#/definitions/utils.Payload'
+      summary: Complete file upload
+      tags:
+      - Files
+  /api/v1/files/presign:
+    post:
+      consumes:
+      - application/json
+      description: Accepts a list of files (name and size), validates the total size,
+        and returns presigned PUT URLs for each file. Each upload session is identified
+        by a unique token.
+      parameters:
+      - description: List of files to upload
+        in: body
+        name: input
+        required: true
+        schema:
+          items:
+            properties:
+              filename:
+                type: string
+              size:
+                type: integer
+            type: object
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Presigned URLs generated successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Payload'
+            - properties:
+                data:
+                  $ref: '#/definitions/handlers.PresignResponse'
+              type: object
+        "400":
+          description: Invalid input or size limit exceeded
+          schema:
+            $ref: '#/definitions/utils.Payload'
+        "405":
+          description: Method not allowed
+          schema:
+            $ref: '#/definitions/utils.Payload'
+        "500":
+          description: Failed to generate presigned URL
+          schema:
+            $ref: '#/definitions/utils.Payload'
+      summary: Generate presigned URLs for file upload
       tags:
       - Files
   /api/v1/share/{token}:
     get:
-      description: Fetch metadata of all files in a transfer using its share token
+      consumes:
+      - application/json
+      description: Returns metadata (name, size, contentType, index) of all files
+        in a shared transfer.
       parameters:
       - description: Share token
         in: path
@@ -48,24 +152,30 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Files retrieved successfully
+          schema:
+            $ref: '#/definitions/utils.Payload'
+        "400":
+          description: Missing or invalid token
           schema:
             $ref: '#/definitions/utils.Payload'
         "404":
-          description: Not Found
+          description: Invalid or expired share link
           schema:
             $ref: '#/definitions/utils.Payload'
         "410":
-          description: Gone
+          description: Share link has expired
           schema:
             $ref: '#/definitions/utils.Payload'
       summary: Retrieve shared file details
       tags:
-      - Files
-  /api/v1/share/{token}/download/{index}:
+      - Share
+  /api/v1/share/{token}/presign-download/{index}:
     get:
-      description: Download the file corresponding to the given index in the anonymous
-        transfer
+      consumes:
+      - application/json
+      description: Returns a temporary signed URL to download a specific file (by
+        index) from a shared transfer.
       parameters:
       - description: Share token
         in: path
@@ -78,21 +188,25 @@ paths:
         required: true
         type: integer
       produces:
-      - application/octet-stream
+      - application/json
       responses:
         "200":
-          description: OK
+          description: Presigned download URL generated successfully
           schema:
-            type: file
+            $ref: '#/definitions/utils.Payload'
+        "400":
+          description: Missing or invalid parameters
+          schema:
+            $ref: '#/definitions/utils.Payload'
         "404":
-          description: Not Found
+          description: File not found or invalid share link
           schema:
             $ref: '#/definitions/utils.Payload'
         "410":
-          description: Gone
+          description: Share link has expired
           schema:
             $ref: '#/definitions/utils.Payload'
-      summary: Download a specific file from a shared transfer
+      summary: Generate a presigned download URL
       tags:
-      - Files
+      - Share
 swagger: "2.0"

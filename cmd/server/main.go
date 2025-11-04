@@ -8,12 +8,24 @@ import (
 	"time"
 
 	"github.com/rohits-web03/cryptodrop/internal/api"
+	"github.com/rohits-web03/cryptodrop/internal/config"
 	"github.com/rohits-web03/cryptodrop/internal/repositories"
 )
 
 func main() {
 	// Connect to database
 	repositories.ConnectDatabase()
+	// Initialize R2
+	err := repositories.InitR2(
+		config.Envs.R2.AccessKeyID,
+		config.Envs.R2.SecretAccessKey,
+		config.Envs.R2.AccountID,
+		config.Envs.R2.BucketName,
+		config.Envs.R2.Region,
+	)
+	if err != nil {
+		log.Fatalf("failed to init R2: %v", err)
+	}
 
 	const defaultPort = "8080"
 	port := os.Getenv("PORT")

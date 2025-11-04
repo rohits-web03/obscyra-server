@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 
@@ -14,13 +13,15 @@ import (
 // GET /api/v1/share/{token}
 // GetSharedFiles godoc
 // @Summary Retrieve shared file details
-// @Description Fetch metadata of all files in a transfer using its share token
-// @Tags Files
+// @Description Returns metadata (name, size, contentType, index) of all files in a shared transfer.
+// @Tags Share
+// @Accept json
 // @Produce json
 // @Param token path string true "Share token"
-// @Success 200 {object} utils.Payload
-// @Failure 404 {object} utils.Payload
-// @Failure 410 {object} utils.Payload
+// @Success 200 {object} utils.Payload "Files retrieved successfully"
+// @Failure 400 {object} utils.Payload "Missing or invalid token"
+// @Failure 404 {object} utils.Payload "Invalid or expired share link"
+// @Failure 410 {object} utils.Payload "Share link has expired"
 // @Router /api/v1/share/{token} [get]
 func GetSharedFiles(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
@@ -49,6 +50,7 @@ func GetSharedFiles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check expiry
+	// Ensure the transfer link is still valid
 	if time.Now().After(transfer.ExpiresAt) {
 		utils.JSONResponse(w, http.StatusGone, utils.Payload{
 			Success: false,
@@ -61,9 +63,10 @@ func GetSharedFiles(w http.ResponseWriter, r *http.Request) {
 	files := make([]map[string]interface{}, 0, len(transfer.Files))
 	for _, f := range transfer.Files {
 		files = append(files, map[string]interface{}{
-			"name":  f.Filename,
-			"size":  f.Size,
-			"index": f.Index,
+			"name":        f.Filename,
+			"size":        f.Size,
+			"contentType": f.ContentType,
+			"index":       f.Index,
 		})
 	}
 
@@ -71,25 +74,27 @@ func GetSharedFiles(w http.ResponseWriter, r *http.Request) {
 		Success: true,
 		Message: "Files retrieved successfully",
 		Data: map[string]any{
-			"expiresAt": transfer.ExpiresAt,
-			"files":     files,
+			"expires_at": transfer.ExpiresAt,
+			"files":      files,
 		},
 	})
 }
 
-// GET /api/v1/share/{token}/download/{index}
-// DownloadSharedFile godoc
-// @Summary Download a specific file from a shared transfer
-// @Description Download the file corresponding to the given index in the anonymous transfer
-// @Tags Files
-// @Produce octet-stream
+// GET /api/v1/share/{token}/presign-download/{index}
+// PresignDownload godoc
+// @Summary Generate a presigned download URL
+// @Description Returns a temporary signed URL to download a specific file (by index) from a shared transfer.
+// @Tags Share
+// @Accept json
+// @Produce json
 // @Param token path string true "Share token"
 // @Param index path int true "File index"
-// @Success 200 {file} file
-// @Failure 404 {object} utils.Payload
-// @Failure 410 {object} utils.Payload
-// @Router /api/v1/share/{token}/download/{index} [get]
-func DownloadSharedFile(w http.ResponseWriter, r *http.Request) {
+// @Success 200 {object} utils.Payload "Presigned download URL generated successfully"
+// @Failure 400 {object} utils.Payload "Missing or invalid parameters"
+// @Failure 404 {object} utils.Payload "File not found or invalid share link"
+// @Failure 410 {object} utils.Payload "Share link has expired"
+// @Router /api/v1/share/{token}/presign-download/{index} [get]
+func PresignDownload(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
 	indexStr := r.PathValue("index")
 	if token == "" || indexStr == "" {
@@ -143,18 +148,22 @@ func DownloadSharedFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Open the file for reading
-	f, err := os.Open(file.Path)
+	url, err := repositories.GeneratePresignedGetURL(r.Context(), file.Path, 15*time.Minute)
 	if err != nil {
 		utils.JSONResponse(w, http.StatusInternalServerError, utils.Payload{
 			Success: false,
-			Message: "Failed to read file",
+			Message: "Failed to generate download URL",
 		})
 		return
 	}
-	defer f.Close()
 
-	w.Header().Set("Content-Disposition", "attachment; filename=\""+file.Filename+"\"")
-	w.Header().Set("Access-Control-Expose-Headers", "Content-Disposition")
-	http.ServeFile(w, r, file.Path)
+	utils.JSONResponse(w, http.StatusOK, utils.Payload{
+		Success: true,
+		Message: "Presigned download URL generated successfully",
+		Data: map[string]any{
+			"url":          url,
+			"content_type": file.ContentType,
+			"filename":     file.Filename,
+		},
+	})
 }

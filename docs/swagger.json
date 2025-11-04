@@ -4,11 +4,11 @@
         "contact": {}
     },
     "paths": {
-        "/api/v1/files": {
+        "/api/v1/files/complete": {
             "post": {
-                "description": "Upload multiple files (≤100 MB total) and receive a share token",
+                "description": "Verifies uploaded files on R2, stores file metadata, and registers the upload session in the database. Each transfer is valid for 1 hour and limited to 100MB for anonymous uploads.",
                 "consumes": [
-                    "multipart/form-data"
+                    "application/json"
                 ],
                 "produces": [
                     "application/json"
@@ -16,25 +16,127 @@
                 "tags": [
                     "Files"
                 ],
-                "summary": "Upload one or more files anonymously",
+                "summary": "Complete file upload",
                 "parameters": [
                     {
-                        "type": "file",
-                        "description": "Files to upload",
-                        "name": "files",
-                        "in": "formData",
-                        "required": true
+                        "description": "Upload completion payload",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CompleteUploadInput"
+                        }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Files uploaded successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.Payload"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "additionalProperties": true
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid input or verification failed",
                         "schema": {
                             "$ref": "#/definitions/utils.Payload"
                         }
                     },
+                    "405": {
+                        "description": "Method not allowed",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Payload"
+                        }
+                    },
+                    "500": {
+                        "description": "Database error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Payload"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/files/presign": {
+            "post": {
+                "description": "Accepts a list of files (name and size), validates the total size, and returns presigned PUT URLs for each file. Each upload session is identified by a unique token.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Files"
+                ],
+                "summary": "Generate presigned URLs for file upload",
+                "parameters": [
+                    {
+                        "description": "List of files to upload",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "filename": {
+                                        "type": "string"
+                                    },
+                                    "size": {
+                                        "type": "integer"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Presigned URLs generated successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.Payload"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handlers.PresignResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid input or size limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Payload"
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Payload"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to generate presigned URL",
                         "schema": {
                             "$ref": "#/definitions/utils.Payload"
                         }
@@ -44,12 +146,15 @@
         },
         "/api/v1/share/{token}": {
             "get": {
-                "description": "Fetch metadata of all files in a transfer using its share token",
+                "description": "Returns metadata (name, size, contentType, index) of all files in a shared transfer.",
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Files"
+                    "Share"
                 ],
                 "summary": "Retrieve shared file details",
                 "parameters": [
@@ -63,19 +168,25 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Files retrieved successfully",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Payload"
+                        }
+                    },
+                    "400": {
+                        "description": "Missing or invalid token",
                         "schema": {
                             "$ref": "#/definitions/utils.Payload"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "Invalid or expired share link",
                         "schema": {
                             "$ref": "#/definitions/utils.Payload"
                         }
                     },
                     "410": {
-                        "description": "Gone",
+                        "description": "Share link has expired",
                         "schema": {
                             "$ref": "#/definitions/utils.Payload"
                         }
@@ -83,16 +194,19 @@
                 }
             }
         },
-        "/api/v1/share/{token}/download/{index}": {
+        "/api/v1/share/{token}/presign-download/{index}": {
             "get": {
-                "description": "Download the file corresponding to the given index in the anonymous transfer",
+                "description": "Returns a temporary signed URL to download a specific file (by index) from a shared transfer.",
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
-                    "application/octet-stream"
+                    "application/json"
                 ],
                 "tags": [
-                    "Files"
+                    "Share"
                 ],
-                "summary": "Download a specific file from a shared transfer",
+                "summary": "Generate a presigned download URL",
                 "parameters": [
                     {
                         "type": "string",
@@ -111,19 +225,25 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Presigned download URL generated successfully",
                         "schema": {
-                            "type": "file"
+                            "$ref": "#/definitions/utils.Payload"
+                        }
+                    },
+                    "400": {
+                        "description": "Missing or invalid parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Payload"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "File not found or invalid share link",
                         "schema": {
                             "$ref": "#/definitions/utils.Payload"
                         }
                     },
                     "410": {
-                        "description": "Gone",
+                        "description": "Share link has expired",
                         "schema": {
                             "$ref": "#/definitions/utils.Payload"
                         }
@@ -133,6 +253,62 @@
         }
     },
     "definitions": {
+        "handlers.CompleteUploadInput": {
+            "type": "object",
+            "properties": {
+                "files": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "contentType": {
+                                "type": "string"
+                            },
+                            "filename": {
+                                "type": "string"
+                            },
+                            "key": {
+                                "type": "string"
+                            },
+                            "size": {
+                                "type": "integer"
+                            }
+                        }
+                    }
+                },
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.PresignResponse": {
+            "type": "object",
+            "properties": {
+                "token": {
+                    "type": "string"
+                },
+                "urls": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.PresignedFile"
+                    }
+                }
+            }
+        },
+        "handlers.PresignedFile": {
+            "type": "object",
+            "properties": {
+                "filename": {
+                    "type": "string"
+                },
+                "key": {
+                    "type": "string"
+                },
+                "uploadURL": {
+                    "type": "string"
+                }
+            }
+        },
         "utils.Payload": {
             "type": "object",
             "properties": {
