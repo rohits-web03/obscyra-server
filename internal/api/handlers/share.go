@@ -33,10 +33,14 @@ func GetSharedFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// TODO: Check JWT token and get user ID from claim
+	// TODO: Check if user is recipient of this transfer
+
 	db := repositories.DB
 	var transfer models.Transfer
 
 	// Fetch transfer and preload its files
+	// TODO: Get encrypted key for recipient
 	err := db.Preload("Files").
 		Where("token = ? AND deleted = ?", token, false).
 		First(&transfer).Error
@@ -70,6 +74,7 @@ func GetSharedFiles(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	// TODO: send encrypted key in response
 	utils.JSONResponse(w, http.StatusOK, utils.Payload{
 		Success: true,
 		Message: "Files retrieved successfully",
@@ -104,6 +109,9 @@ func PresignDownload(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+
+	// TODO: Check JWT token and get user ID from claim
+	// TODO: Check if user is recipient of this transfer
 
 	index, err := strconv.Atoi(indexStr)
 	if err != nil {

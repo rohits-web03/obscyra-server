@@ -10,6 +10,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/google/uuid"
+	"github.com/rohits-web03/obscyra/internal/api/middleware"
 	"github.com/rohits-web03/obscyra/internal/models"
 	"github.com/rohits-web03/obscyra/internal/repositories"
 	"github.com/rohits-web03/obscyra/internal/utils"
@@ -32,6 +33,11 @@ type PresignResponse struct {
 	URLs  []PresignedFile `json:"urls"`
 }
 
+type RecipientInput struct {
+	PublicKey    string `json:"publicKey"`    // Used to find the User ID
+	EncryptedKey string `json:"encryptedKey"` // The encrypted AES key
+}
+
 type CompleteUploadInput struct {
 	Token string `json:"token"`
 	Files []struct {
@@ -40,6 +46,7 @@ type CompleteUploadInput struct {
 		Key         string `json:"key"`
 		ContentType string `json:"contentType"`
 	} `json:"files"`
+	RecipientKeys []RecipientInput `json:"recipientKeys"`
 }
 
 const maxUploadSize = 100 << 20 // 100 MB
@@ -151,6 +158,15 @@ func CompleteUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var senderUUID *uuid.UUID
+	if val := r.Context().Value(middleware.UserIDKey); val != nil {
+		if idStr, ok := val.(string); ok && idStr != "" {
+			if parsedID, err := uuid.Parse(idStr); err == nil {
+				senderUUID = &parsedID
+			}
+		}
+	}
+
 	var input CompleteUploadInput
 
 	dec := json.NewDecoder(r.Body)
@@ -213,10 +229,12 @@ func CompleteUpload(w http.ResponseWriter, r *http.Request) {
 	db := repositories.DB
 	err := db.Transaction(func(tx *gorm.DB) error {
 		// Create transfer record
+		// TDOD: Add user ID as sender ID
 		transfer := models.Transfer{
 			Token:       input.Token,
 			ExpiresAt:   time.Now().Add(1 * time.Hour),
-			IsAnonymous: true,
+			IsAnonymous: senderUUID == nil,
+			SenderID: senderUUID,
 			TotalSize:   TotalSize,
 		}
 
@@ -236,6 +254,28 @@ func CompleteUpload(w http.ResponseWriter, r *http.Request) {
 			}
 			if err := tx.Create(&file).Error; err != nil {
 				return err
+			}
+		}
+
+		if len(input.RecipientKeys) > 0 {
+			for _, rKey := range input.RecipientKeys {
+				// look up the User ID using the Public Key
+				var user models.User
+				// Note: Public keys are text, so direct string comparison works
+				if err := tx.Select("id").Where("public_key = ?", rKey.PublicKey).First(&user).Error; err != nil {
+					// Option: Return error if user not found, OR skip them. 
+					// For security, failing is usually better to prevent partial sends.
+					return fmt.Errorf("recipient not found for provided public key")
+				}
+
+				recipient := models.Recipient{
+					TransferID:   transfer.ID,
+					ReceiverID:   user.ID,
+					EncryptedKey: rKey.EncryptedKey,
+				}
+				if err := tx.Create(&recipient).Error; err != nil {
+					return err
+				}
 			}
 		}
 
