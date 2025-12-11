@@ -14,7 +14,7 @@ type Transfer struct {
 	ExpiresAt   time.Time `json:"expiresAt" gorm:"not null"`
 	Deleted     bool      `json:"deleted" gorm:"default:false"`
 	TotalSize   int64     `json:"totalSize" gorm:"not null"` // sum of all file sizes
-	IsAnonymous bool      `json:"isAnonymous" gorm:"default:true"`
+	IsAnonymous bool      `json:"isAnonymous"`
 	SenderID    *uuid.UUID `json:"senderId" gorm:"type:uuid;index"`
 	Files       []File    `json:"files" gorm:"foreignKey:TransferID"` // one-to-many relation
 	Recipients  []Recipient `json:"recipients" gorm:"foreignKey:TransferID"` // one-to-many relation
