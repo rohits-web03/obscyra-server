@@ -66,7 +66,7 @@ func getEnv(key, fallback string) string {
 
 func CorsConfig() cors.Options {
 	return cors.Options{
-		AllowedOrigins:   []string{"*"},
+		AllowedOrigins:   []string{"http://localhost:5173","https://obscyra.vercel.app"},
 		AllowedMethods:   []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions},
 		AllowedHeaders:   []string{"*"},
 		AllowCredentials: true,
