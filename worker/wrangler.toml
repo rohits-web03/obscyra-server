@@ -1,0 +1,12 @@
+name = "obscyra-cleaner"
+main = "src/cleanup.ts"
+compatibility_date = "2025-01-01"
+
+# Cron: run every 5 minutes
+[triggers]
+crons = ["*/5 * * * *"]
+
+# R2 Binding
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "obscyra"

@@ -47,3 +47,6 @@ coverage.out
 
 # Temporary files
 uploads/
+
+# Worker
+worker/node_modules
