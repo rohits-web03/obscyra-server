@@ -29,9 +29,11 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type Input struct {
-		Username string `json:"username"`
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		Username            string `json:"username"`
+		Email               string `json:"email"`
+		Password            string `json:"password"`
+		PublicKey           string `json:"publicKey"`
+		EncryptedPrivateKey string `json:"encryptedPrivateKey"`
 	}
 
 	var input Input
@@ -86,9 +88,11 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 		}
 
 		newUser := models.User{
-			Username: input.Username,
-			Email:    input.Email,
-			Password: string(hashedPassword),
+			Username:            input.Username,
+			Email:               input.Email,
+			Password:            string(hashedPassword),
+			PublicKey:           input.PublicKey,
+			EncryptedPrivateKey: input.EncryptedPrivateKey,
 		}
 
 		if createErr := repositories.DB.Create(&newUser).Error; createErr != nil {
@@ -240,6 +244,10 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 	utils.JSONResponse(w, http.StatusOK, utils.Payload{
 		Success: true,
 		Message: "Login successful",
+		Data: map[string]any{
+			"private_key": user.EncryptedPrivateKey,
+			"public_key":  user.PublicKey,
+		},
 	})
 }
 

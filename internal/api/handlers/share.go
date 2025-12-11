@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/rohits-web03/obscyra/internal/api/middleware"
 	"github.com/rohits-web03/obscyra/internal/models"
 	"github.com/rohits-web03/obscyra/internal/repositories"
 	"github.com/rohits-web03/obscyra/internal/utils"
@@ -33,10 +35,28 @@ func GetSharedFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var receiverUUID uuid.UUID
+	if val := r.Context().Value(middleware.UserIDKey); val != nil {
+		if idStr, ok := val.(string); ok && idStr != "" {
+			if parsedID, err := uuid.Parse(idStr); err == nil {
+				receiverUUID = parsedID
+			}
+		}
+	}
+
+	if receiverUUID == uuid.Nil {
+		utils.JSONResponse(w, http.StatusUnauthorized, utils.Payload{
+			Success: false,
+			Message: "You must be logged in to view this secure transfer",
+		})
+		return
+	}
+	
 	db := repositories.DB
 	var transfer models.Transfer
 
 	// Fetch transfer and preload its files
+	// TODO: Get encrypted key for recipient
 	err := db.Preload("Files").
 		Where("token = ? AND deleted = ?", token, false).
 		First(&transfer).Error
@@ -59,13 +79,27 @@ func GetSharedFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Digital Envelope check
+	var recipient models.Recipient
+	err = db.Where("transfer_id = ? AND receiver_id = ?", transfer.ID, receiverUUID).
+		First(&recipient).Error
+
+	if err != nil {
+		// If record not found, this user was not added to the transfer
+		utils.JSONResponse(w, http.StatusForbidden, utils.Payload{
+			Success: false,
+			Message: "You are not an authorized recipient for this transfer",
+		})
+		return
+	}
+
 	// Prepare safe response
 	files := make([]map[string]interface{}, 0, len(transfer.Files))
 	for _, f := range transfer.Files {
 		files = append(files, map[string]interface{}{
 			"name":        f.Filename,
-			"size":        f.Size,
-			"contentType": f.ContentType,
+			"size":        f.Size, // Encrypted size
+			"contentType": f.ContentType, // Original MIME type
 			"index":       f.Index,
 		})
 	}
@@ -76,6 +110,8 @@ func GetSharedFiles(w http.ResponseWriter, r *http.Request) {
 		Data: map[string]any{
 			"expires_at": transfer.ExpiresAt,
 			"files":      files,
+			"encrypted_key": recipient.EncryptedKey,
+			"sender_id": transfer.SenderID,
 		},
 	})
 }
@@ -101,6 +137,23 @@ func PresignDownload(w http.ResponseWriter, r *http.Request) {
 		utils.JSONResponse(w, http.StatusBadRequest, utils.Payload{
 			Success: false,
 			Message: "Missing token or index",
+		})
+		return
+	}
+
+	var receiverUUID uuid.UUID
+	if val := r.Context().Value(middleware.UserIDKey); val != nil {
+		if idStr, ok := val.(string); ok && idStr != "" {
+			if parsedID, err := uuid.Parse(idStr); err == nil {
+				receiverUUID = parsedID
+			}
+		}
+	}
+
+	if receiverUUID == uuid.Nil {
+		utils.JSONResponse(w, http.StatusUnauthorized, utils.Payload{
+			Success: false,
+			Message: "Unauthorized",
 		})
 		return
 	}
@@ -132,6 +185,21 @@ func PresignDownload(w http.ResponseWriter, r *http.Request) {
 		utils.JSONResponse(w, http.StatusGone, utils.Payload{
 			Success: false,
 			Message: "This link has expired",
+		})
+		return
+	}
+
+	// SECURITY CHECK: IS USER A RECIPIENT?
+	// Prevents random users from downloading even if they can't decrypt
+	var count int64
+	db.Model(&models.Recipient{}).
+		Where("transfer_id = ? AND receiver_id = ?", transfer.ID, receiverUUID).
+		Count(&count)
+
+	if count == 0 {
+		utils.JSONResponse(w, http.StatusForbidden, utils.Payload{
+			Success: false,
+			Message: "Access denied",
 		})
 		return
 	}
